@@ -52,8 +52,8 @@ public:
 
     virtual ~Algorithm() = default;
 
-    std::vector<int*> executeTask(const std::vector<long long>& areaOfResponsibility, const std::vector<int*>& data) {
-        return execute(areaOfResponsibility, data);
+    std::vector<int*> executeTask(const std::vector<long long>& areaOfResponsibility, const std::vector<int*>& data, std::atomic<bool>& stopFlag) {
+        return execute(areaOfResponsibility, data, stopFlag);
     }
 
     virtual void cleanupData(std::vector<int*>& data, std::vector<std::vector<int*>>& result) const = 0;
@@ -70,6 +70,7 @@ public:
         std::vector<int*> data = generateData(dataSize);
         std::vector<std::thread> threadPool;
         std::vector<std::vector<int*>> result(threads);
+        std::atomic<bool> stopFlag = false;
 
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -83,10 +84,16 @@ public:
                 }
 
                 threadPool.emplace_back([&, i, areaOfResponsibility]() {
-                    result[i] = executeTask(areaOfResponsibility, data);
-
-                    if (verbose) {
-                        std::cout << "Thread " << i << " completed its task." << std::endl;
+                    try {
+                        if (!stopFlag) {
+                            result[i] = executeTask(areaOfResponsibility, data, stopFlag);
+                        }
+                        if (verbose && stopFlag) {
+                            std::lock_guard<std::mutex> lock(outputMutex);
+                            std::cout << "Thread " << i << " stopped early." << std::endl;
+                        }
+                    } catch (const std::exception& e) {
+                        std::cerr << "Thread " << i << " encountered an exception: " << e.what() << std::endl;
                     }
                 });
             }
@@ -132,7 +139,9 @@ public:
     virtual std::string getType() const = 0;
 
 protected:
-    virtual std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData) = 0;
+    std::mutex outputMutex; // For synchronizing output
+
+    virtual std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>& stopFlag) = 0;
     virtual std::vector<int*> generateData(long long dataSize) = 0;
     virtual std::vector<long long> calculate_area_of_responsibility(int currentThread, int maxThreads, long long dataSize) = 0;
     virtual bool test_result(const std::vector<int*>& input_data, const std::vector<int*>& result, long long dataSize) = 0;
@@ -220,7 +229,7 @@ protected:
         return true;
     }
 
-    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData) override {
+    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>&  stopFlag) override {
         int* data = inputData[0]; // Access the data
         long long start = area_of_responsibility[0];
         long long end = area_of_responsibility[1];
@@ -397,226 +406,281 @@ protected:
     }
 };
 
-// // ===================== MatrixOperationAlgorithm =====================
-// class MatrixOperationAlgorithm : public Algorithm {
-// public:
-//     MatrixOperationAlgorithm(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
-//         : Algorithm(threadCount, dataSize, verbose, reiterative) {}
-//
-//     [[nodiscard]] std::string getType() const override {
-//         return "MatrixOperationAlgorithm";
-//     }
-//
-// protected:
-//     bool verbose;
-//     void cleanupData(void** data, void*** result, int threads) const override {
-//         if (verbose) {
-//             std::cout << "Cleaning up matrix data and result." << std::endl;
-//         }
-//         auto* matrixData = reinterpret_cast<std::vector<std::vector<int>>*>(data);
-//         delete matrixData;
-//
-//
-//         if (verbose) {
-//             std::cout << "Matrix data and result cleaned up." << std::endl;
-//         }
-//     }
-//     void** generateData(long long dataSize) override {
-//         if (verbose) {
-//             std::cout << "Generating data for matrix of size " << dataSize << "x" << dataSize << std::endl;
-//         }
-//
-//         auto* matrix = new std::vector<std::vector<int>>(dataSize, std::vector<int>(dataSize));
-//         std::random_device rd;
-//         std::mt19937 gen(rd());
-//         std::uniform_int_distribution<> dis(1, 100);
-//         for (auto& row : *matrix) {
-//             std::ranges::generate(row, [&]() { return dis(gen); });
-//         }
-//
-//         if (verbose) {
-//             std::cout << "Data generation complete." << std::endl;
-//         }
-//
-//         return reinterpret_cast<void**>(matrix);
-//     }
-//
-//     long long* calculate_area_of_responsibility(int currentThread, int maxThreads, long long dataSize) override {
-//         if (maxThreads <= 0 || dataSize <= 0) {
-//             throw std::invalid_argument("Thread count and data size must be greater than zero.");
-//         }
-//
-//         auto* range = new long long[2];
-//         long long segmentSize = dataSize / maxThreads;
-//         range[0] = currentThread * segmentSize;
-//         range[1] = (currentThread == maxThreads - 1) ? dataSize : (currentThread + 1) * segmentSize;
-//
-//         if (range[0] >= range[1]) {
-//             throw std::logic_error("Invalid range calculated for thread responsibility.");
-//         }
-//
-//         if (verbose) {
-//             std::cout << "Thread " << currentThread << " responsible for rows [" << range[0] << ", " << range[1] - 1 << "]\n";
-//         }
-//
-//         return range;
-//     }
-//
-//     void** execute(long long* area_of_responsibility, void** inputData) override {
-//         if (verbose) {
-//             std::cout << "Executing computation for assigned rows." << std::endl;
-//         }
-//
-//         auto* matrix = reinterpret_cast<std::vector<std::vector<int>>*>(inputData);
-//         auto* partialResult = new std::vector<std::vector<int>>();
-//
-//         for (long long row = area_of_responsibility[0]; row < area_of_responsibility[1]; ++row) {
-//             partialResult->push_back(processRow((*matrix)[row], *matrix));
-//         }
-//
-//         if (verbose) {
-//             std::cout << "Execution complete for assigned rows." << std::endl;
-//         }
-//
-//         return reinterpret_cast<void**>(partialResult);
-//     }
-//
-//     bool test_result(void** input_data, void** result, long long dataSize) override {
-//         auto* originalMatrix = reinterpret_cast<std::vector<std::vector<int>>*>(input_data);
-//         auto* threadedResult = reinterpret_cast<std::vector<std::vector<int>>*>(result);
-//         auto singleThreadResult = *originalMatrix;
-//
-//         if (verbose) {
-//             std::cout << "Starting single-threaded execution for verification." << std::endl;
-//         }
-//
-//         for (long long i = 0; i < dataSize; ++i) {
-//             // if (verbose) {
-//             //     std::cout << "Processing row " << i << " for single-threaded verification." << std::endl;
-//             // }
-//             singleThreadResult[i] = processRow(singleThreadResult[i], singleThreadResult);
-//         }
-//         if (verbose) {
-//             std::cout << "Single-threaded execution complete." << std::endl;
-//         }
-//
-//         if (singleThreadResult.size() != threadedResult->size()) {
-//             throw std::runtime_error("Mismatch in matrix dimensions: single-threaded result and threaded result sizes differ.");
-//         }
-//
-//         for (long long i = 0; i < dataSize; ++i) {
-//             const auto& expectedRow = singleThreadResult[i];
-//             const auto& actualRow = (*threadedResult)[i];
-//
-//             if (expectedRow.size() != actualRow.size()) {
-//                 throw std::runtime_error("Row size mismatch at row " + std::to_string(i));
-//             }
-//
-//             if (expectedRow != actualRow) {
-//                 if (verbose) {
-//                     std::cout << "Mismatch found in row " << i << std::endl;
-//                     for (size_t j = 0; j < expectedRow.size(); ++j) {
-//                         if (expectedRow[j] != actualRow[j]) {
-//                             // std::cout << "Index " << j
-//                             //           << ": Expected " << expectedRow[j]
-//                             //           << ", Got " << actualRow[j] << std::endl;
-//                         }
-//                     }
-//                     std::cout << "Row " << i << " does not match between single-threaded and multi-threaded results." << std::endl;
-//                     std::cout << "Returning false" << std::endl;
-//                 }
-//
-//                 return false;
-//             }
-//         }
-//
-//         if (verbose) {
-//             std::cout << "All rows match between single-threaded and multi-threaded results." << std::endl;
-//         }
-//
-//         return true;
-//     }
-//
-//
-//     void** concat_results(void*** partial_results, void** inputData, int thread_count, long long data_size) override {
-//         auto* finalMatrix = new std::vector<std::vector<int>>(data_size);
-//
-//         for (int i = 0; i < thread_count; ++i) {
-//             long long* range = calculate_area_of_responsibility(i, thread_count, data_size);
-//             auto* partialResult = reinterpret_cast<std::vector<std::vector<int>>*>(partial_results[i]);
-//
-//             if (partialResult == nullptr) {
-//                 throw std::runtime_error("Partial result is null for thread " + std::to_string(i));
-//             }
-//
-//             for (long long row = range[0]; row < range[1]; ++row) {
-//                 if (row - range[0] >= partialResult->size()) {
-//                     throw std::out_of_range("Invalid row access in partial results.");
-//                 }
-//                 (*finalMatrix)[row] = (*partialResult)[row - range[0]];
-//             }
-//
-//             delete partialResult;
-//             delete[] range;
-//         }
-//
-//         return reinterpret_cast<void**>(finalMatrix);
-//     }
-//
-//
-//     virtual std::vector<int> processRow(const std::vector<int>& row, const std::vector<std::vector<int>>& matrix) = 0;
-// };
-//
-// class MatrixMultiplication : public MatrixOperationAlgorithm {
-// public:
-//     MatrixMultiplication(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
-//         : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
-//
-// protected:
-//     std::vector<int> processRow(const std::vector<int>& row, const std::vector<std::vector<int>>& matrix) override {
-//         std::vector<std::vector<int>> localMatrixCopy = matrix; // Thread-safe local copy
-//         std::vector<int> result(localMatrixCopy.size(), 0);
-//         for (size_t col = 0; col < localMatrixCopy.size(); ++col) {
-//             for (size_t k = 0; k < localMatrixCopy.size(); ++k) {
-//                 result[col] += row[k] * localMatrixCopy[k][col];
-//             }
-//         }
-//         return result;
-//     }
-// };
-//
-// class MatrixAddition : public MatrixOperationAlgorithm {
-// public:
-//     MatrixAddition(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
-//         : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
-//
-// protected:
-//     std::vector<int> processRow(const std::vector<int>& row, const std::vector<std::vector<int>>& matrix) override {
-//         std::vector<std::vector<int>> localMatrixCopy = matrix; // Thread-safe local copy
-//         std::vector<int> result(row.size());
-//         for (size_t col = 0; col < row.size(); ++col) {
-//             result[col] = row[col] + localMatrixCopy[col][col];
-//         }
-//         return result;
-//     }
-// };
-//
-//
-// class MatrixTransposition : public MatrixOperationAlgorithm {
-// public:
-//     MatrixTransposition(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
-//         : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
-//
-// protected:
-//     std::vector<int> processRow(const std::vector<int>& row, const std::vector<std::vector<int>>& matrix) override {
-//         std::vector<std::vector<int>> localMatrixCopy = matrix; // Thread-safe local copy
-//         std::vector<int> result(localMatrixCopy.size());
-//         size_t rowIndex = &row - &matrix[0];
-//         for (size_t col = 0; col < localMatrixCopy.size(); ++col) {
-//             result[col] = localMatrixCopy[col][rowIndex];
-//         }
-//         return result;
-//     }
-// };
-//
+class MatrixOperationAlgorithm : public Algorithm {
+public:
+    MatrixOperationAlgorithm(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
+        : Algorithm(threadCount, dataSize, verbose, reiterative) {}
+
+    [[nodiscard]] std::string getType() const override {
+        return "MatrixOperationAlgorithm";
+    }
+
+protected:
+    void cleanupData(std::vector<int*>& data, std::vector<std::vector<int*>>& result) const override {
+        for (auto& row : data) {
+            delete[] row;
+        }
+        data.clear();
+        for (auto& partial_result : result) {
+            for (auto& row : partial_result) {
+                delete[] row;
+            }
+        }
+        result.clear();
+    }
+
+    std::vector<int*> generateData(long long dataSize) override {
+        std::vector<int*> matrix(dataSize);
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(1, 100);
+        for (long long i = 0; i < dataSize; ++i) {
+            matrix[i] = new int[dataSize];
+            for (long long j = 0; j < dataSize; ++j) {
+                matrix[i][j] = dis(gen);
+            }
+        }
+        return matrix;
+    }
+
+    std::vector<long long> calculate_area_of_responsibility(int currentThread, int maxThreads, long long dataSize) override {
+        long long segmentSize = dataSize / maxThreads;
+        return {currentThread * segmentSize, (currentThread == maxThreads - 1) ? dataSize : (currentThread + 1) * segmentSize};
+    }
+
+    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>&  stopFlag) override {
+        std::vector<int*> partialResult;
+        for (long long i = area_of_responsibility[0]; i < area_of_responsibility[1]; ++i) {
+            partialResult.push_back(processRow(inputData[i], inputData));
+        }
+        return partialResult;
+    }
+
+    bool test_result(const std::vector<int*>& input_data, const std::vector<int*>& result, long long dataSize) override {
+        for (long long i = 0; i < dataSize; ++i) {
+            auto expected = processRow(input_data[i], input_data);
+            for (long long j = 0; j < dataSize; ++j) {
+                if (expected[j] != result[i][j]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    std::vector<int*> concat_results(const std::vector<std::vector<int*>>& partial_results, const std::vector<int*>& inputData, int thread_count, long long data_size) override {
+        std::vector<int*> finalMatrix(data_size);
+        for (int i = 0; i < thread_count; ++i) {
+            auto area = calculate_area_of_responsibility(i, thread_count, data_size);
+            for (long long j = area[0]; j < area[1]; ++j) {
+                finalMatrix[j] = partial_results[i][j - area[0]];
+            }
+        }
+        return finalMatrix;
+    }
+
+    virtual int* processRow(const int* row, const std::vector<int*>& matrix) = 0;
+};
+
+class MatrixMultiplication : public MatrixOperationAlgorithm {
+public:
+    MatrixMultiplication(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
+        : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
+
+protected:
+    int* processRow(const int* row, const std::vector<int*>& matrix) override {
+        long long size = matrix.size();
+        int* result = new int[size];
+        std::fill(result, result + size, 0);
+        for (long long col = 0; col < size; ++col) {
+            for (long long k = 0; k < size; ++k) {
+                result[col] += row[k] * matrix[k][col];
+            }
+        }
+        return result;
+    }
+};
+
+class MatrixAddition : public MatrixOperationAlgorithm {
+public:
+    MatrixAddition(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
+        : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
+
+protected:
+    int* processRow(const int* row, const std::vector<int*>& matrix) override {
+        long long size = matrix.size();
+        int* result = new int[size];
+        for (long long col = 0; col < size; ++col) {
+            result[col] = row[col] + matrix[col][col];
+        }
+        return result;
+    }
+};
+
+class MatrixTransposition : public MatrixOperationAlgorithm {
+public:
+    MatrixTransposition(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
+        : MatrixOperationAlgorithm(threadCount, dataSize, verbose, reiterative) {}
+
+protected:
+    int* processRow(const int* row, const std::vector<int*>& matrix) override {
+        long long size = matrix.size();
+        int* result = new int[size];
+        long long rowIndex = std::distance(matrix.begin(), std::find(matrix.begin(), matrix.end(), row));
+        for (long long col = 0; col < size; ++col) {
+            result[col] = matrix[col][rowIndex];
+        }
+        return result;
+    }
+};
+
+class SearchAlgorithms : public Algorithm {
+protected:
+    int targetNumber;
+    std::atomic<bool> found;
+    std::atomic<long long> foundIndex;
+
+public:
+    SearchAlgorithms(int threadCount, long long dataSize, bool verbose = false, bool* reiterative = nullptr)
+        : Algorithm(threadCount, dataSize, verbose, reiterative), found(false), foundIndex(-1) {}
+
+    [[nodiscard]] virtual std::string getType() const override = 0;
+
+protected:
+    std::vector<int*> generateData(long long dataSize) override {
+        auto* data = new int[dataSize];
+        for (long long i = 0; i < dataSize; ++i) {
+            data[i] = i + 1;
+        }
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<long long> indexDis(0, dataSize - 1);
+        long long targetIndex = indexDis(gen);
+        targetNumber = data[targetIndex];
+        if (verbose) {
+            std::lock_guard<std::mutex> lock(outputMutex);
+            std::cout << "Target number: " << targetNumber << " placed at index: " << targetIndex << std::endl;
+        }
+        return {data};
+    }
+
+    std::vector<long long> calculate_area_of_responsibility(int currentThread, int maxThreads, long long dataSize) override {
+        long long segmentSize = dataSize / maxThreads;
+        return {currentThread * segmentSize, (currentThread == maxThreads - 1) ? dataSize : (currentThread + 1) * segmentSize};
+    }
+
+    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>& stopFlag) override {
+        for (long long i = area_of_responsibility[0]; i < area_of_responsibility[1] && !stopFlag; ++i) {
+            if (inputData[0][i] == targetNumber) {
+                found = true;
+                foundIndex = i;
+                stopFlag = true;
+                if (verbose) {
+                    std::lock_guard<std::mutex> lock(outputMutex);
+                    std::cout << "Thread found the number " << targetNumber << " at index " << i << std::endl;
+                }
+                break;
+            }
+        }
+        return {};
+    }
+
+    bool test_result(const std::vector<int*>& input_data, const std::vector<int*>&, long long dataSize) override {
+        if (foundIndex < 0 || foundIndex >= dataSize || input_data[0][foundIndex] != targetNumber) {
+            if (verbose) {
+                std::cerr << "Test failed. Target number " << targetNumber << " was not correctly found." << std::endl;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    std::vector<int*> concat_results(const std::vector<std::vector<int*>>& partial_results, const std::vector<int*>& inputData, int, long long) override {
+        return inputData;
+    }
+
+    void cleanupData(std::vector<int*>& data, std::vector<std::vector<int*>>& result) const override {
+        if (!data.empty() && data[0] != nullptr) {
+            delete[] data[0];
+            data[0] = nullptr;
+        }
+        data.clear();
+        for (auto& res : result) {
+            if (!res.empty() && res[0] != nullptr) {
+                delete[] res[0];
+                res[0] = nullptr;
+            }
+        }
+        result.clear();
+    }
+};
+
+
+class LinearSearch : public SearchAlgorithms {
+public:
+    LinearSearch(int threadCount, long long dataSize, bool verbose = false)
+        : SearchAlgorithms(threadCount, dataSize, verbose) {}
+
+    [[nodiscard]] std::string getType() const override {
+        return "LinearSearch";
+    }
+
+protected:
+    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>& stopFlag) override {
+        for (long long i = area_of_responsibility[0]; i < area_of_responsibility[1] && !stopFlag; ++i) {
+            if (inputData[0][i] == targetNumber) {
+                found = true;
+                foundIndex = i;
+                stopFlag = true;
+                if (verbose) {
+                    std::lock_guard<std::mutex> lock(outputMutex);
+                    std::cout << "Thread found the number " << targetNumber << " at index " << i << std::endl;
+                }
+                break;
+            }
+        }
+        return {};
+    }
+};
+
+
+class BinarySearch : public SearchAlgorithms {
+public:
+    BinarySearch(int threadCount, long long dataSize, bool verbose = false)
+        : SearchAlgorithms(threadCount, dataSize, verbose) {}
+
+    [[nodiscard]] std::string getType() const override {
+        return "BinarySearch";
+    }
+
+protected:
+    std::vector<int*> execute(const std::vector<long long>& area_of_responsibility, const std::vector<int*>& inputData, std::atomic<bool>& stopFlag) override {
+        long long start = area_of_responsibility[0];
+        long long end = area_of_responsibility[1];
+        while (start < end && !stopFlag) {
+            long long mid = start + (end - start) / 2;
+            if (inputData[0][mid] == targetNumber) {
+                found = true;
+                foundIndex = mid;
+                stopFlag = true;
+                if (verbose) {
+                    std::lock_guard<std::mutex> lock(outputMutex);
+                    std::cout << "Thread found the number " << targetNumber << " at index " << mid << std::endl;
+                }
+                break;
+            } else if (inputData[0][mid] < targetNumber) {
+                start = mid + 1;
+            } else {
+                end = mid;
+            }
+        }
+        return {};
+    }
+
+    std::vector<int*> generateData(long long dataSize) override {
+        auto data = SearchAlgorithms::generateData(dataSize);
+        std::sort(data[0], data[0] + dataSize); // Ensure data is sorted for binary search
+        return data;
+    }
+};
 

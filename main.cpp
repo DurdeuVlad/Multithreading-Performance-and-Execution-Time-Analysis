@@ -17,6 +17,8 @@ struct AlgorithmType {
         MATRIX_MULTIPLICATION,
         MATRIX_ADDITION,
         MATRIX_TRANSPOSE,
+        LINEAR_SEARCH,
+        BINARY_SEARCH,
         UNKNOWN
     };
 };
@@ -49,6 +51,12 @@ AlgorithmType::Type getAlgorithmType(const std::string &algorithm) {
     if (algorithm == "matrix_transpose") {
         return AlgorithmType::MATRIX_TRANSPOSE;
     }
+    if (algorithm == "linear_search") {
+        return AlgorithmType::LINEAR_SEARCH;
+    }
+    if (algorithm == "binary_search") {
+        return AlgorithmType::BINARY_SEARCH;
+    }
     std::cerr << "Unknown algorithm '" << algorithm << "'.\n";
     return AlgorithmType::UNKNOWN;
 }
@@ -77,15 +85,21 @@ void selectAlgorithm(const std::string& algorithm, int threadCount, long long da
         case AlgorithmType::HEAP_SORT:
             algo = new HeapSort(threadCount, dataSize, verbose, &iterative);
             break;
-        // case AlgorithmType::MATRIX_MULTIPLICATION:
-        //     algo = new MatrixMultiplication(threadCount, dataSize, verbose, &iterative);
-        //     break;
-        // case AlgorithmType::MATRIX_ADDITION:
-        //     algo = new MatrixAddition(threadCount, dataSize, verbose, &iterative);
-        //     break;
-        // case AlgorithmType::MATRIX_TRANSPOSE:
-        //     algo = new MatrixTransposition(threadCount, dataSize, verbose, &iterative);
-        //     break;
+        case AlgorithmType::MATRIX_MULTIPLICATION:
+            algo = new MatrixMultiplication(threadCount, dataSize, verbose);
+            break;
+        case AlgorithmType::MATRIX_ADDITION:
+            algo = new MatrixAddition(threadCount, dataSize, verbose);
+            break;
+        case AlgorithmType::MATRIX_TRANSPOSE:
+            algo = new MatrixTransposition(threadCount, dataSize, verbose);
+            break;
+        case AlgorithmType::LINEAR_SEARCH:
+            algo = new LinearSearch(threadCount, dataSize, verbose);
+            break;
+        case AlgorithmType::BINARY_SEARCH:
+            algo = new BinarySearch(threadCount, dataSize, verbose);
+            break;
         default:
             std::cerr << "Error: Unsupported or unknown algorithm '" << algorithm << "'.\n";
         return;
@@ -99,11 +113,28 @@ void selectAlgorithm(const std::string& algorithm, int threadCount, long long da
 
 
 void runAlgorithm(const std::string& algorithm, int fireStart, int fireEnd, int sizeStart, int sizeEnd) {
+    // limit the size of the data to LLONG_MAX
+    sizeStart = std::ranges::min(sizeStart, 63);
+    sizeStart = std::ranges::max(sizeStart, 0);
+    sizeEnd = std::ranges::max(sizeEnd, 0);
+    sizeEnd = std::ranges::min(sizeEnd, 63);
+    // swap if size start is greater than size end
+    if (sizeStart > sizeEnd) {
+        std::swap(sizeStart, sizeEnd);
+    }
+    fireStart = std::ranges::max(fireStart, 0);
+    fireEnd = std::ranges::max(fireEnd, 0);
+    fireStart = std::ranges::min(fireStart, 31);
+    fireEnd = std::ranges::min(fireEnd, 31);
+    // swap if fire start is greater than fire end
+    if (fireStart > fireEnd) {
+        std::swap(fireStart, fireEnd);
+    }
     std::cout << "Running " << algorithm << " with varying threads and data sizes...\n";
     for (int i = sizeStart; i <= sizeEnd; ++i) {
-        long long dataSize = pow(2, i);
+        auto dataSize = static_cast<long long>(pow(2, i));
         for (int j = fireStart; j <= fireEnd; ++j) {
-            int numThreads = pow(2, j);
+            int numThreads = static_cast<int>(pow(2, j));
             std::cout << "Algorithm: " << algorithm
                       << ", Threads: " << numThreads
                       << ", Data size: " << dataSize << std::endl;
@@ -114,12 +145,12 @@ void runAlgorithm(const std::string& algorithm, int fireStart, int fireEnd, int 
 
 void testAlgorithm(const std::string& algorithm, int fireStart, int fireEnd) {
     std::cout << "Testing " << algorithm << " with varying threads and data sizes...\n";
-    runAlgorithm(algorithm, fireStart, fireEnd, 10, 20);
+    runAlgorithm(algorithm, fireStart, fireEnd, 5, 10);
 }
 
 void analyzeAlgorithm(const std::string& algorithm) {
     std::cout << "Analyzing performance for " << algorithm << " with various configurations...\n";
-    testAlgorithm(algorithm, 1, 4);
+    testAlgorithm(algorithm, 0, 4);
 }
 
 void toggleVerbose(bool enableVerbose) {
@@ -217,10 +248,10 @@ void processCommand(const std::string& commandLine) {
 
 int main() {
     std::string input;
-    // processCommand("analyze matrix_multiplication");
     processCommand("verbose true");
-    processCommand("analyze bubble_sort");
-    // processCommand("analyze quick_sort");
+    processCommand("iterative true");
+    // processCommand("analyze matrix_multiplication");
+    processCommand("analyze quick_sort");
     std::cout << "Enter a command (type 'help' for instructions):\n";
     while (std::getline(std::cin, input)) {
         processCommand(input);
