@@ -5,6 +5,7 @@
 #include "Algorithm.cpp"
 
 bool verbose = false;
+bool iterative = false;
 struct AlgorithmType {
     enum Type {
         BUBBLE_SORT,
@@ -13,6 +14,9 @@ struct AlgorithmType {
         INSERTION_SORT,
         SELECTION_SORT,
         HEAP_SORT,
+        MATRIX_MULTIPLICATION,
+        MATRIX_ADDITION,
+        MATRIX_TRANSPOSE,
         UNKNOWN
     };
 };
@@ -36,6 +40,15 @@ AlgorithmType::Type getAlgorithmType(const std::string &algorithm) {
     if (algorithm == "heap_sort") {
         return AlgorithmType::HEAP_SORT;
     }
+    if (algorithm == "matrix_multiplication") {
+        return AlgorithmType::MATRIX_MULTIPLICATION;
+    }
+    if (algorithm == "matrix_addition") {
+        return AlgorithmType::MATRIX_ADDITION;
+    }
+    if (algorithm == "matrix_transpose") {
+        return AlgorithmType::MATRIX_TRANSPOSE;
+    }
     std::cerr << "Unknown algorithm '" << algorithm << "'.\n";
     return AlgorithmType::UNKNOWN;
 }
@@ -47,23 +60,32 @@ void selectAlgorithm(const std::string& algorithm, int threadCount, long long da
 
     switch (type) {
         case AlgorithmType::BUBBLE_SORT:
-            algo = new BubbleSort(threadCount, dataSize);
+            algo = new BubbleSort(threadCount, dataSize, verbose, &iterative);
             break;
         case AlgorithmType::QUICK_SORT:
-            algo = new QuickSort(threadCount, dataSize);
+            algo = new QuickSort(threadCount, dataSize, verbose, &iterative);
             break;
         case AlgorithmType::MERGE_SORT:
-            algo = new MergeSort(threadCount, dataSize);
+            algo = new MergeSort(threadCount, dataSize, verbose, &iterative);
             break;
         case AlgorithmType::INSERTION_SORT:
-            algo = new InsertionSort(threadCount, dataSize);
+            algo = new InsertionSort(threadCount, dataSize, verbose, &iterative);
             break;
         case AlgorithmType::SELECTION_SORT:
-            algo = new SelectionSort(threadCount, dataSize);
+            algo = new SelectionSort(threadCount, dataSize, verbose, &iterative);
             break;
         case AlgorithmType::HEAP_SORT:
-            algo = new HeapSort(threadCount, dataSize);
+            algo = new HeapSort(threadCount, dataSize, verbose, &iterative);
             break;
+        // case AlgorithmType::MATRIX_MULTIPLICATION:
+        //     algo = new MatrixMultiplication(threadCount, dataSize, verbose, &iterative);
+        //     break;
+        // case AlgorithmType::MATRIX_ADDITION:
+        //     algo = new MatrixAddition(threadCount, dataSize, verbose, &iterative);
+        //     break;
+        // case AlgorithmType::MATRIX_TRANSPOSE:
+        //     algo = new MatrixTransposition(threadCount, dataSize, verbose, &iterative);
+        //     break;
         default:
             std::cerr << "Error: Unsupported or unknown algorithm '" << algorithm << "'.\n";
         return;
@@ -168,7 +190,25 @@ void processCommand(const std::string& commandLine) {
         } else {
             std::cerr << "Error: Missing parameter for 'verbose' command.\n";
         }
-    } else if (command == "help") {
+
+    }
+    else if (command == "iterative") {
+        std::string state;
+        if (ss >> state) {
+            if (state == "true") {
+                iterative = true;
+                std::cout << "Iterative mode enabled.\n";
+            } else if (state == "false") {
+                iterative = false;
+                std::cout << "Iterative mode disabled.\n";
+            } else {
+                std::cerr << "Error: Invalid parameter for 'verbose' command. Use 'true' or 'false'.\n";
+            }
+        } else {
+            std::cerr << "Error: Missing parameter for 'verbose' command.\n";
+        }
+    }
+    else if (command == "help") {
         showHelp();
     } else {
         std::cerr << "Error: Unknown command.\n";
@@ -177,6 +217,10 @@ void processCommand(const std::string& commandLine) {
 
 int main() {
     std::string input;
+    // processCommand("analyze matrix_multiplication");
+    processCommand("verbose true");
+    processCommand("analyze bubble_sort");
+    // processCommand("analyze quick_sort");
     std::cout << "Enter a command (type 'help' for instructions):\n";
     while (std::getline(std::cin, input)) {
         processCommand(input);
