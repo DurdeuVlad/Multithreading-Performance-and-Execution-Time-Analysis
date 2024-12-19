@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm> // For std::merge
 #include <stdexcept> // For std::runtime_error
+#include "json.hpp"
 
 // ===================== Measurement =====================
 class Measurement {
@@ -22,6 +23,8 @@ public:
 
     Measurement(double threadCount, double duration, double dataSize, long long start, long long end, bool correct, bool* iterative = nullptr)
         : threadCount(threadCount), duration(duration), dataSize(dataSize), start(start), end(end), correct(correct), iterative(iterative) {}
+
+    Measurement() = default;
 
     [[nodiscard]] std::string toString() const {
         if (iterative != nullptr) {
@@ -36,6 +39,21 @@ public:
                ", Data Size: " + std::to_string(dataSize) +
                ", Is algorithm correct?: " + std::to_string(correct);
     }
+
+    [[nodiscard]] nlohmann::json toJson() const {
+        nlohmann::json j;
+        j["duration"] = duration;
+        j["start"] = start;
+        j["end"] = end;
+        j["correct"] = correct;
+        if (iterative != nullptr) {
+            j["iterative"] = *iterative;
+        } else {
+            j["iterative"] = false;
+        }
+        return j;
+    }
+
 };
 
 // ===================== Algorithm =====================

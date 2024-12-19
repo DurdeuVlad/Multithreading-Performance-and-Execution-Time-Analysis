@@ -6,6 +6,7 @@
 
 bool verbose = false;
 bool iterative = false;
+bool jsonOutput = false;
 struct AlgorithmType {
     enum Type {
         BUBBLE_SORT,
@@ -61,7 +62,7 @@ AlgorithmType::Type getAlgorithmType(const std::string &algorithm) {
     return AlgorithmType::UNKNOWN;
 }
 
-void selectAlgorithm(const std::string& algorithm, int threadCount, long long dataSize) {
+Measurement selectAlgorithm(const std::string& algorithm, int threadCount, long long dataSize) {
     Algorithm* algo = nullptr;
 
     AlgorithmType::Type type = getAlgorithmType(algorithm);
@@ -102,13 +103,17 @@ void selectAlgorithm(const std::string& algorithm, int threadCount, long long da
             break;
         default:
             std::cerr << "Error: Unsupported or unknown algorithm '" << algorithm << "'.\n";
-        return;
+        return Measurement();
     }
 
     Measurement result = algo->executeAndMeasure(threadCount, dataSize);
-    std::cout << result.toString() << std::endl;
-
+    if (!jsonOutput) {
+        std::cout << result.toString() << std::endl;
+    }
     delete algo;
+    return result;
+
+
 }
 
 
@@ -135,10 +140,25 @@ void runAlgorithm(const std::string& algorithm, int fireStart, int fireEnd, int 
         auto dataSize = static_cast<long long>(pow(2, i));
         for (int j = fireStart; j <= fireEnd; ++j) {
             int numThreads = static_cast<int>(pow(2, j));
-            std::cout << "Algorithm: " << algorithm
-                      << ", Threads: " << numThreads
-                      << ", Data size: " << dataSize << std::endl;
-            selectAlgorithm(algorithm, numThreads, dataSize);
+            if (jsonOutput) {
+                nlohmann::json jsonObject;
+                jsonObject["algorithm"] = algorithm;
+                jsonObject["threads"] = numThreads;
+                jsonObject["data_size"] = dataSize;
+
+                // Call selectAlgorithm and capture its output if necessary
+                // For example, if selectAlgorithm returns a Measurement object:
+                Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
+                jsonObject["result"] = result.toJson();
+
+                // Output the JSON object with indentation for readability
+                std::cout << jsonObject.dump(4) << std::endl;
+            } else {
+                std::cout << "Algorithm: " << algorithm
+                          << ", Threads: " << numThreads
+                          << ", Data size: " << dataSize << std::endl;
+                selectAlgorithm(algorithm, numThreads, dataSize);
+            }
         }
     }
 }
@@ -241,17 +261,34 @@ void processCommand(const std::string& commandLine) {
     }
     else if (command == "help") {
         showHelp();
-    } else {
+    } else if (command == "json_output") {
+        std::string state;
+        if (ss >> state) {
+            if (state == "true") {
+                jsonOutput = true;
+                std::cout << "JSON output enabled.\n";
+            } else if (state == "false") {
+                jsonOutput = false;
+                std::cout << "JSON output disabled.\n";
+            } else {
+                std::cerr << "Error: Invalid parameter for 'json_output' command. Use 'true' or 'false'.\n";
+            }
+        } else {
+            std::cerr << "Error: Missing parameter for 'json_output' command.\n";
+        }
+    }
+    else {
         std::cerr << "Error: Unknown command.\n";
     }
 }
 
 int main() {
     std::string input;
-    processCommand("verbose true");
-    processCommand("iterative true");
-    // processCommand("analyze matrix_multiplication");
+    // processCommand("verbose true");
+    processCommand("json_output true");
     processCommand("analyze quick_sort");
+    // // processCommand("analyze matrix_multiplication");
+    // processCommand("analyze quick_sort");
     std::cout << "Enter a command (type 'help' for instructions):\n";
     while (std::getline(std::cin, input)) {
         processCommand(input);
