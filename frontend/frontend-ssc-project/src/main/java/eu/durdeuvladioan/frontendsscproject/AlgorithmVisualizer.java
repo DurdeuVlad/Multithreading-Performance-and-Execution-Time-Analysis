@@ -119,6 +119,7 @@ public class AlgorithmVisualizer extends Application {
                 jsonOutput.append(line).append("\n");
             }
             parseAndDisplayResults(jsonOutput.toString());
+            chartPane.populateChart(jsonOutput.toString());
         } catch (IOException e) {
             Platform.runLater(() -> outputPane.appendOutput("Error reading process output: " + e.getMessage() + "\n"));
             logger.log(Level.SEVERE, "Error reading process output.", e);
