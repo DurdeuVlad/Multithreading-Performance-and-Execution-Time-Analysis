@@ -1,0 +1,3 @@
+C:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou/cmake-build-release/CMakeFiles/proiect_nou.dir
+C:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou/cmake-build-release/CMakeFiles/edit_cache.dir
+C:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou/cmake-build-release/CMakeFiles/rebuild_cache.dir

@@ -2,12 +2,15 @@ package eu.durdeuvladioan.frontendsscproject;
 
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.*;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,12 +42,52 @@ public class AlgorithmVisualizer extends Application {
         executeButton.setOnAction(e -> executeCommand());
 
         HBox inputBox = new HBox(10, inputPane.getInputFields(), executeButton);
-        VBox mainLayout = new VBox(10, inputBox, outputPane.getOutputArea(), chartPane.getChart());
-        Scene scene = new Scene(mainLayout, 1000, 600);
+        VBox topSection = new VBox(10, inputBox, outputPane.getOutputArea());
+
+        LineChart<Number, Number> chart = chartPane.getChart();
+        chart.setMinHeight(400); // Minimum height for the chart
+        VBox.setVgrow(chart, Priority.ALWAYS);
+
+        VBox mainLayout = new VBox(10, topSection, chart);
+        Scene scene = new Scene(mainLayout);
 
         primaryStage.setScene(scene);
+
+        Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
+        primaryStage.setX(screenBounds.getMinX());
+        primaryStage.setY(screenBounds.getMinY());
+        primaryStage.setWidth(screenBounds.getWidth());
+        primaryStage.setHeight(screenBounds.getHeight());
+
+        topSection.setPrefHeight(screenBounds.getHeight() / 3);
+
+        addZooming(chart);
+
         primaryStage.show();
     }
+
+    private void addZooming(LineChart<Number, Number> chart) {
+        chart.setOnScroll((ScrollEvent event) -> {
+            double zoomFactor = 0.1;
+            NumberAxis xAxis = (NumberAxis) chart.getXAxis();
+            NumberAxis yAxis = (NumberAxis) chart.getYAxis();
+
+            if (event.getDeltaY() > 0) {
+                xAxis.setLowerBound(xAxis.getLowerBound() + zoomFactor * (xAxis.getUpperBound() - xAxis.getLowerBound()));
+                xAxis.setUpperBound(xAxis.getUpperBound() - zoomFactor * (xAxis.getUpperBound() - xAxis.getLowerBound()));
+                yAxis.setLowerBound(yAxis.getLowerBound() + zoomFactor * (yAxis.getUpperBound() - yAxis.getLowerBound()));
+                yAxis.setUpperBound(yAxis.getUpperBound() - zoomFactor * (yAxis.getUpperBound() - yAxis.getLowerBound()));
+            } else {
+                xAxis.setLowerBound(xAxis.getLowerBound() - zoomFactor * (xAxis.getUpperBound() - xAxis.getLowerBound()));
+                xAxis.setUpperBound(xAxis.getUpperBound() + zoomFactor * (xAxis.getUpperBound() - xAxis.getLowerBound()));
+                yAxis.setLowerBound(yAxis.getLowerBound() - zoomFactor * (yAxis.getUpperBound() - yAxis.getLowerBound()));
+                yAxis.setUpperBound(yAxis.getUpperBound() + zoomFactor * (yAxis.getUpperBound() - yAxis.getLowerBound()));
+            }
+
+            event.consume();
+        });
+    }
+
 
     private void executeCommand() {
         outputPane.clearOutput();

@@ -103,7 +103,7 @@ Measurement selectAlgorithm(const std::string& algorithm, int threadCount, long 
             break;
         default:
             std::cerr << "Error: Unsupported or unknown algorithm '" << algorithm << "'.\n";
-        return Measurement();
+            return Measurement();
     }
 
     Measurement result = algo->executeAndMeasure(threadCount, dataSize);
@@ -135,41 +135,56 @@ void runAlgorithm(const std::string& algorithm, int fireStart, int fireEnd, int 
     if (fireStart > fireEnd) {
         std::swap(fireStart, fireEnd);
     }
-    std::cout << "Running " << algorithm << " with varying threads and data sizes...\n";
+    if (!jsonOutput) {
+        std::cout << "Running " << algorithm << " with varying threads and data sizes...\n";
+    }
+    nlohmann::json allResults = nlohmann::json::array();
+
     for (int i = sizeStart; i <= sizeEnd; ++i) {
         auto dataSize = static_cast<long long>(pow(2, i));
         for (int j = fireStart; j <= fireEnd; ++j) {
             int numThreads = static_cast<int>(pow(2, j));
-            if (jsonOutput) {
-                nlohmann::json jsonObject;
-                jsonObject["algorithm"] = algorithm;
-                jsonObject["threads"] = numThreads;
-                jsonObject["data_size"] = dataSize;
+            nlohmann::json jsonObject;
+            jsonObject["algorithm"] = algorithm;
+            jsonObject["threads"] = numThreads;
+            jsonObject["data_size"] = dataSize;
 
-                // Call selectAlgorithm and capture its output if necessary
-                // For example, if selectAlgorithm returns a Measurement object:
-                Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
-                jsonObject["result"] = result.toJson();
-
-                // Output the JSON object with indentation for readability
-                std::cout << jsonObject.dump(4) << std::endl;
-            } else {
-                std::cout << "Algorithm: " << algorithm
-                          << ", Threads: " << numThreads
-                          << ", Data size: " << dataSize << std::endl;
-                selectAlgorithm(algorithm, numThreads, dataSize);
+            // Call selectAlgorithm and capture its output if necessary
+            Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
+            if (result == Measurement()) {
+                continue;
             }
+            jsonObject["result"] = result.toJson();
+
+            // Accumulate all results in a single array
+            allResults.push_back(jsonObject);
+        }
+    }
+
+    // Output the entire JSON structure at the end
+    if (jsonOutput) {
+        std::cout << allResults.dump(4) << std::endl;
+    } else {
+        for (const auto& result : allResults) {
+            std::cout << "Algorithm: " << result["algorithm"]
+                      << ", Threads: " << result["threads"]
+                      << ", Data size: " << result["data_size"] << std::endl;
         }
     }
 }
 
 void testAlgorithm(const std::string& algorithm, int fireStart, int fireEnd) {
-    std::cout << "Testing " << algorithm << " with varying threads and data sizes...\n";
+    if (!jsonOutput)
+    {
+        std::cout << "Testing " << algorithm << " with varying threads and data sizes...\n";
+    }
     runAlgorithm(algorithm, fireStart, fireEnd, 5, 10);
 }
 
 void analyzeAlgorithm(const std::string& algorithm) {
-    std::cout << "Analyzing performance for " << algorithm << " with various configurations...\n";
+    if (!jsonOutput) {
+        std::cout << "Analyzing performance for " << algorithm << " with various configurations...\n";
+    }
     testAlgorithm(algorithm, 0, 4);
 }
 
@@ -188,7 +203,7 @@ void showHelp() {
 }
 
 bool isValidPositive(int value) {
-    return value > 0;
+    return value >= 0;
 }
 
 void processCommand(const std::string& commandLine) {
@@ -282,17 +297,33 @@ void processCommand(const std::string& commandLine) {
     }
 }
 
-int main() {
+int main_infinite() {
     std::string input;
-    // processCommand("verbose true");
-    processCommand("json_output true");
-    processCommand("analyze quick_sort");
-    // // processCommand("analyze matrix_multiplication");
-    // processCommand("analyze quick_sort");
-    std::cout << "Enter a command (type 'help' for instructions):\n";
+    if (!jsonOutput) {
+        std::cout << "Enter a command (type 'help' for instructions):\n";
+    }
     while (std::getline(std::cin, input)) {
         processCommand(input);
-        std::cout << "\nEnter another command (or 'help' for instructions):\n";
+        if (!jsonOutput) {
+            std::cout << "Enter a command (type 'help' for instructions):\n";
+        }
+    }
+    return 0;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc > 1) {
+        std::string commandLine;
+        for (int i = 1; i < argc; ++i) {
+            commandLine += argv[i];
+            if (i < argc - 1) {
+                commandLine += " ";
+            }
+        }
+        jsonOutput = true;
+        processCommand(commandLine);
+    } else {
+        main_infinite();
     }
     return 0;
 }

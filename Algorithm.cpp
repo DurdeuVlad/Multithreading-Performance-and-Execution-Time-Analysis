@@ -8,9 +8,7 @@
 #include <algorithm>
 #include <queue>
 #include <bits/stdc++.h>
-#include <vector>
-#include <algorithm> // For std::merge
-#include <stdexcept> // For std::runtime_error
+#include <stdexcept>
 #include "json.hpp"
 
 // ===================== Measurement =====================
@@ -54,6 +52,14 @@ public:
         return j;
     }
 
+    bool operator==(const Measurement & measurement) const {
+        return threadCount == measurement.threadCount &&
+               duration == measurement.duration &&
+               dataSize == measurement.dataSize &&
+               start == measurement.start &&
+               end == measurement.end &&
+               correct == measurement.correct;
+    };
 };
 
 // ===================== Algorithm =====================

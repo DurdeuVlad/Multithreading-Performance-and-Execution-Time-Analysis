@@ -51,13 +51,15 @@ build cmake_object_order_depends_target_proiect_nou: phony || .
 
 build CMakeFiles/proiect_nou.dir/main.cpp.obj: CXX_COMPILER__proiect_nou_unscanned_Debug C$:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou/main.cpp || cmake_object_order_depends_target_proiect_nou
   DEP_FILE = CMakeFiles\proiect_nou.dir\main.cpp.obj.d
-  FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
+  FLAGS = -static-libgcc -static-libstdc++ -g -std=gnu++20 -fdiagnostics-color=always
+  INCLUDES = -IC:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou
   OBJECT_DIR = CMakeFiles\proiect_nou.dir
   OBJECT_FILE_DIR = CMakeFiles\proiect_nou.dir
 
 build CMakeFiles/proiect_nou.dir/Algorithm.cpp.obj: CXX_COMPILER__proiect_nou_unscanned_Debug C$:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou/Algorithm.cpp || cmake_object_order_depends_target_proiect_nou
   DEP_FILE = CMakeFiles\proiect_nou.dir\Algorithm.cpp.obj.d
-  FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
+  FLAGS = -static-libgcc -static-libstdc++ -g -std=gnu++20 -fdiagnostics-color=always
+  INCLUDES = -IC:/Users/Public/Documents/GitHub/ssc-labs/proiect-nou
   OBJECT_DIR = CMakeFiles\proiect_nou.dir
   OBJECT_FILE_DIR = CMakeFiles\proiect_nou.dir
 
@@ -70,7 +72,7 @@ build CMakeFiles/proiect_nou.dir/Algorithm.cpp.obj: CXX_COMPILER__proiect_nou_un
 # Link the executable proiect_nou.exe
 
 build proiect_nou.exe: CXX_EXECUTABLE_LINKER__proiect_nou_Debug CMakeFiles/proiect_nou.dir/main.cpp.obj CMakeFiles/proiect_nou.dir/Algorithm.cpp.obj
-  FLAGS = -g
+  FLAGS = -static-libgcc -static-libstdc++ -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\proiect_nou.dir
   POST_BUILD = cd .
