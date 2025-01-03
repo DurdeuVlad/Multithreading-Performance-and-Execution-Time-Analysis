@@ -7,6 +7,7 @@
 bool verbose = false;
 bool iterative = false;
 bool jsonOutput = false;
+int testSize = 1;
 struct AlgorithmType {
     enum Type {
         BUBBLE_SORT,
@@ -149,12 +150,25 @@ void runAlgorithm(const std::string& algorithm, int fireStart, int fireEnd, int 
             jsonObject["threads"] = numThreads;
             jsonObject["data_size"] = dataSize;
 
-            // Call selectAlgorithm and capture its output if necessary
-            Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
-            if (result == Measurement()) {
-                continue;
+            // Call selectAlgorithm and capture its output if necessary, also redo the measurements testSize times
+            // and return the average
+            int successFullTests = 0;
+            Measurement finalResult = selectAlgorithm(algorithm, numThreads, dataSize);
+            for (int k = 0; k < testSize-1; ++k) {
+                Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
+                if (result == Measurement()) {
+                    continue;
+                }
+                finalResult += result;
+                successFullTests++;
             }
-            jsonObject["result"] = result.toJson();
+            finalResult.duration = finalResult.duration / testSize;
+            // Measurement result = selectAlgorithm(algorithm, numThreads, dataSize);
+            // if (result == Measurement()) {
+            //     continue;
+            // }
+            jsonObject["test_count"] = successFullTests + 1;
+            jsonObject["result"] = finalResult.toJson();
 
             // Accumulate all results in a single array
             allResults.push_back(jsonObject);
@@ -298,6 +312,9 @@ void processCommand(const std::string& commandLine) {
 }
 
 int main_infinite() {
+    processCommand("verbose true");
+    processCommand("json_output false");
+    processCommand("analyze heap_sort");
     std::string input;
     if (!jsonOutput) {
         std::cout << "Enter a command (type 'help' for instructions):\n";
@@ -319,8 +336,20 @@ int main(int argc, char* argv[]) {
             if (i < argc - 1) {
                 commandLine += " ";
             }
+            if (argv[i] == "--use-iterative") {
+                iterative = true;
+            }
+            // --repeat=INT is used to repeat the test INT times
+            if (std::string(argv[i]).find("--repeat=") != std::string::npos) {
+                std::string repeat = std::string(argv[i]).substr(9);
+                testSize = std::stoi(repeat);
+            }
         }
         jsonOutput = true;
+        // check at the end if the command is iterative by checking if the last word is --use-iterative
+        if (commandLine.find("--use-iterative") != std::string::npos) {
+            iterative = true;
+        }
         processCommand(commandLine);
     } else {
         main_infinite();

@@ -10,6 +10,8 @@
 #include <bits/stdc++.h>
 #include <stdexcept>
 #include "json.hpp"
+#include <barrier>
+
 
 // ===================== Measurement =====================
 class Measurement {
@@ -41,8 +43,8 @@ public:
     [[nodiscard]] nlohmann::json toJson() const {
         nlohmann::json j;
         j["duration"] = duration;
-        j["start"] = start;
-        j["end"] = end;
+        // j["start"] = start;
+        // j["end"] = end;
         j["correct"] = correct;
         if (iterative != nullptr) {
             j["iterative"] = *iterative;
@@ -59,7 +61,13 @@ public:
                start == measurement.start &&
                end == measurement.end &&
                correct == measurement.correct;
-    };
+    }
+
+    Measurement &operator+=(const Measurement & result) {
+        // add the values of the result to the current object
+        duration += result.duration;
+        return *this;
+    }
 };
 
 // ===================== Algorithm =====================
@@ -70,13 +78,22 @@ protected:
     bool verbose = false;
     bool* reiterative;
 
+
 public:
     Algorithm(int threadCount, long long dataSize, bool verbose, bool* reiterative = nullptr)
         : threadCount(threadCount), dataSize(dataSize), verbose(verbose), reiterative(reiterative) {}
 
     virtual ~Algorithm() = default;
 
-    std::vector<int*> executeTask(const std::vector<long long>& areaOfResponsibility, const std::vector<int*>& data, std::atomic<bool>& stopFlag) {
+    std::vector<int*> executeTask(const std::vector<long long>& areaOfResponsibility, const std::vector<int*>& data,
+        std::atomic<bool>& stopFlag, std::barrier<> & sync_point, int thread_id = 0) {
+        if (verbose) {
+            std::cout << "Thread " << thread_id << " awaiting execution start." << std::endl;
+        }
+        sync_point.arrive_and_wait();
+        if (verbose) {
+            std::cout << "Thread " << thread_id << " starting execution." << std::endl;
+        }
         return execute(areaOfResponsibility, data, stopFlag);
     }
 
@@ -97,6 +114,7 @@ public:
         std::atomic<bool> stopFlag = false;
 
         auto start = std::chrono::high_resolution_clock::now();
+        std::barrier sync_point(threadCount);
 
         try {
             for (int i = 0; i < threads; ++i) {
@@ -106,11 +124,10 @@ public:
                     std::cout << "Thread " << i << " responsible for rows [" << areaOfResponsibility[0] << ", "
                               << areaOfResponsibility[1] << "]." << std::endl;
                 }
-
                 threadPool.emplace_back([&, i, areaOfResponsibility]() {
                     try {
                         if (!stopFlag) {
-                            result[i] = executeTask(areaOfResponsibility, data, stopFlag);
+                            result[i] = executeTask(areaOfResponsibility, data, stopFlag, sync_point, i);
                         }
                         if (verbose && stopFlag) {
                             std::lock_guard<std::mutex> lock(outputMutex);
@@ -401,18 +418,25 @@ public:
 
 protected:
     void sortSegment(int* data, long long start, long long end) override {
-        // Build the heap
-        for (long long i = (end - 1) / 2; i >= start; --i) {
-            heapify(data, end, i);
+        std::vector<int> tempData(data + start, data + end);
+
+        for (long long i = (end - start - 1) / 2; i >= 0; --i) {
+            heapify(tempData, tempData.size(), i);
         }
-        // Extract elements from the heap
-        for (long long i = end - 1; i > start; --i) {
-            std::swap(data[start], data[i]);
-            heapify(data, i, start);
+
+        for (long long i = tempData.size() - 1; i > 0; --i) {
+            std::swap(tempData[0], tempData[i]);
+            heapify(tempData, i, 0);
         }
+
+        // printVector(tempData);
+        for (long long i = 0; i < tempData.size(); ++i) {
+            data[start + i] = tempData[i];
+        }
+
     }
 
-    void heapify(int* data, long long n, long long i) {
+    void heapify(std::vector<int>& data, long long n, long long i) {
         long long largest = i;
         long long left = 2 * i + 1;
         long long right = 2 * i + 2;
@@ -425,7 +449,7 @@ protected:
         }
         if (largest != i) {
             std::swap(data[i], data[largest]);
-            heapify(data, n, largest);
+            heapify(data, n, largest);  // Continue to heapify the subtree
         }
     }
 };
@@ -498,6 +522,10 @@ protected:
             auto area = calculate_area_of_responsibility(i, thread_count, data_size);
             for (long long j = area[0]; j < area[1]; ++j) {
                 finalMatrix[j] = partial_results[i][j - area[0]];
+                if (verbose) {
+                    // print this row
+                    std::cout << "Row " << j << ": ";
+                }
             }
         }
         return finalMatrix;

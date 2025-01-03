@@ -12,6 +12,7 @@ module eu.durdeuvladioan.frontendsscproject {
     requires com.almasb.fxgl.all;
     requires com.fasterxml.jackson.databind;
     requires java.logging;
+    requires javafx.swing;
 
     opens eu.durdeuvladioan.frontendsscproject to javafx.fxml;
     exports eu.durdeuvladioan.frontendsscproject;
